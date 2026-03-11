@@ -3,10 +3,18 @@
 A command-line tool that helps you copy a `.gitignore` from the official GitHub repo:
 - https://github.com/github/gitignore
 
-## Usage
+## Install
+Install cloned repo:
 ```
-python gitignore-init
+pip install -e .
 ```
 
-## TODO
-- Instructions for installing on PATH
+Install directly from GitHub:
+```
+pip install git+https://github.com/fishberg/gitignore-init
+```
+
+## Usage
+```
+gitignore-init
+```
