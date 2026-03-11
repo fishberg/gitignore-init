@@ -9,7 +9,6 @@ Keeps a local clone of https://github.com/github/gitignore at
 
 import curses
 import os
-import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -19,29 +18,14 @@ REPO_URL = "https://github.com/github/gitignore"
 REPO_DIR = Path.home() / ".local" / "share" / "gitignore-templates"
 
 
-def is_online():
-    try:
-        socket.setdefaulttimeout(3)
-        socket.connect(("8.8.8.8", 53))
-        return True
-    except OSError:
-        return False
-
-
 def ensure_repo():
     if REPO_DIR.exists():
-        if is_online():
-            print("Updating gitignore templates...", flush=True)
-            result = subprocess.run(
-                ["git", "pull", "--ff-only"],
-                cwd=REPO_DIR,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                print(f"Warning: git pull failed: {result.stderr.strip()}", flush=True)
-        else:
-            print("Offline — using cached templates.", flush=True)
+        print("Updating gitignore templates...", flush=True)
+        subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=REPO_DIR,
+            capture_output=True,
+        )
     else:
         print("Cloning gitignore templates (one-time setup)...", flush=True)
         result = subprocess.run(
