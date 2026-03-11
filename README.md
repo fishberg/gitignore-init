@@ -10,4 +10,3 @@ python gitignore-init
 
 ## TODO
 - Instructions for installing on PATH
-- Keep a local copy of repo, so queries do not need to ping the web

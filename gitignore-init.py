@@ -2,28 +2,62 @@
 """
 Interactive terminal UI to pick a .gitignore template from github/gitignore.
 Type to filter, arrow keys to navigate, Enter to select.
+
+Keeps a local clone of https://github.com/github/gitignore at
+~/.local/share/gitignore-templates and pulls on each run when online.
 """
 
 import curses
 import os
+import socket
+import subprocess
 import sys
-
-from github import Github, GithubException
-
-
-def get_templates(repo):
-    tree = repo.get_git_tree("main", recursive=True)
-    templates = [
-        item.path[: -len(".gitignore")]
-        for item in tree.tree
-        if item.type == "blob" and item.path.endswith(".gitignore")
-    ]
-    return sorted(templates, key=str.lower)
+from pathlib import Path
 
 
-def get_gitignore_content(repo, template_name):
-    contents = repo.get_contents(template_name + ".gitignore")
-    return contents.decoded_content.decode()
+REPO_URL = "https://github.com/github/gitignore"
+REPO_DIR = Path.home() / ".local" / "share" / "gitignore-templates"
+
+
+def is_online():
+    try:
+        socket.setdefaulttimeout(3)
+        socket.connect(("8.8.8.8", 53))
+        return True
+    except OSError:
+        return False
+
+
+def ensure_repo():
+    if REPO_DIR.exists():
+        if is_online():
+            print("Updating gitignore templates...", flush=True)
+            result = subprocess.run(
+                ["git", "pull", "--ff-only"],
+                cwd=REPO_DIR,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                print(f"Warning: git pull failed: {result.stderr.strip()}", flush=True)
+        else:
+            print("Offline — using cached templates.", flush=True)
+    else:
+        print("Cloning gitignore templates (one-time setup)...", flush=True)
+        result = subprocess.run(
+            ["git", "clone", "--depth=1", REPO_URL, str(REPO_DIR)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"Error cloning repo: {result.stderr.strip()}")
+            sys.exit(1)
+
+
+def get_templates():
+    files = sorted(REPO_DIR.rglob("*.gitignore"), key=lambda p: p.name.lower())
+    # Return paths relative to REPO_DIR, strip the .gitignore suffix for display
+    return [str(p.relative_to(REPO_DIR))[: -len(".gitignore")] for p in files]
 
 
 def interactive_select(stdscr, templates):
@@ -165,14 +199,9 @@ def main():
         print("Error: .gitignore already exists in the current directory.")
         sys.exit(1)
 
-    print("Fetching gitignore templates from GitHub...", flush=True)
-    try:
-        repo = Github().get_repo("github/gitignore")
-        templates = get_templates(repo)
-    except GithubException as e:
-        print(f"GitHub API error: {e}")
-        sys.exit(1)
+    ensure_repo()
 
+    templates = get_templates()
     if not templates:
         print("No templates found.")
         sys.exit(1)
@@ -183,12 +212,8 @@ def main():
         print("No template selected.")
         sys.exit(0)
 
-    print(f"Fetching {selected}.gitignore...", flush=True)
-    try:
-        content = get_gitignore_content(repo, selected)
-    except GithubException as e:
-        print(f"GitHub API error: {e}")
-        sys.exit(1)
+    src = REPO_DIR / (selected + ".gitignore")
+    content = src.read_text()
 
     with open(".gitignore", "w") as f:
         f.write(content)
